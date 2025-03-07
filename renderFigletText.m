@@ -8,11 +8,23 @@ function renderFigletText(textString, fontFile)
     if isKey(fontCache, fontFile)
         figletFont = fontCache(fontFile);
     else
+        fontFile = downloadIfURL(fontFile);
         figletFont = loadFigletFont(fontFile);
         fontCache(fontFile) = figletFont;
     end
     
     printFiglet(textString, figletFont);
+end
+
+function localFile = downloadIfURL(filePath)
+    if startsWith(filePath, 'http')
+        [scriptPath, ~, ~] = fileparts(mfilename('fullpath'));
+        [~, name, ext] = fileparts(filePath);
+        localFile = fullfile(scriptPath, [name, ext]);
+        websave(localFile, filePath);
+    else
+        localFile = filePath;
+    end
 end
 
 function figletFont = loadFigletFont(fontFile)
