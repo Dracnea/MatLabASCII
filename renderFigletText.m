@@ -5,6 +5,8 @@ function renderFigletText(textString, fontFile)
         fontCache = containers.Map('KeyType', 'char', 'ValueType', 'any');
     end
     
+    fontFile = sanitizeFileName(fontFile);
+    
     if isKey(fontCache, fontFile)
         figletFont = fontCache(fontFile);
     else
@@ -16,15 +18,56 @@ function renderFigletText(textString, fontFile)
     printFiglet(textString, figletFont);
 end
 
+% URL Downloads are still buggy based on where they are being downloaded from, often saved as .html
 function localFile = downloadIfURL(filePath)
     if startsWith(filePath, 'http')
         [scriptPath, ~, ~] = fileparts(mfilename('fullpath'));
         [~, name, ext] = fileparts(filePath);
+        
+        if isempty(ext) || ~strcmp(ext, '.flf')
+            ext = '.flf';
+        end
+        
         localFile = fullfile(scriptPath, [name, ext]);
         websave(localFile, filePath);
+        
+        % Check if the downloaded file is actually an HTML file (error page)
+        if isHTMLFile(localFile) || ~isValidFigletFile(localFile)
+            delete(localFile);
+            error('Downloaded file is not a valid FIGlet .flf file. Ensure you are using a raw .flf file link.');
+        end
     else
-        localFile = filePath;
+        localFile = sanitizeFileName(filePath);
     end
+end
+
+function sanitizedName = sanitizeFileName(filePath)
+    [~, name, ~] = fileparts(filePath);
+    sanitizedName = strcat(name, '.flf');
+end
+
+function isHTML = isHTMLFile(filePath)
+    fid = fopen(filePath, 'r');
+    if fid < 0
+        isHTML = false;
+        return;
+    end
+    firstLine = fgetl(fid);
+    fclose(fid);
+    isHTML = contains(firstLine, '<!DOCTYPE html>') || contains(firstLine, '<html>');
+end
+
+function isValid = isValidFigletFile(filePath)
+    fid = fopen(filePath, 'r');
+    if fid < 0
+        isValid = false;
+        return;
+    end
+    
+    firstLine = fgetl(fid);
+    fclose(fid);
+    
+    isValid = ischar(firstLine) && startsWith(firstLine, 'flf2a');
 end
 
 function figletFont = loadFigletFont(fontFile)
@@ -100,4 +143,13 @@ function printFiglet(textString, figletFont)
         disp(outLines{h});
     end
     fprintf('\n');
+end
+
+function cleanUpFLFFiles()
+    [scriptPath, ~, ~] = fileparts(mfilename('fullpath'));
+    flfFiles = dir(fullfile(scriptPath, '*.flf'));
+    for i = 1:length(flfFiles)
+        delete(fullfile(scriptPath, flfFiles(i).name));
+    end
+    fprintf('All .flf files have been deleted from the script directory.\n');
 end
